@@ -703,6 +703,15 @@ func (a *Agent) connectivityChecks() { //nolint:cyclop
 			}
 
 			a.getSelector().ContactCandidates()
+
+			// While a DTLS-in-STUN (SPED) handshake is in progress, also send a
+			// check on the selected pair carrying the queued flight/ack. The
+			// controlled/lite selector's ContactCandidates() is a no-op once the
+			// pair is selected, so without this the agent stops emitting STUN and
+			// the handshake falls back to the DTLS retransmission timer.
+			if a.piggybackActive() {
+				a.pingSelectedPairForPiggyback()
+			}
 		}); err != nil {
 			a.log.Warnf("Failed to start connectivity checks: %v", err)
 		}
@@ -1861,6 +1870,23 @@ func (a *Agent) getSelectedPair() *CandidatePair {
 	}
 
 	return nil
+}
+
+// pingSelectedPairForPiggyback sends a STUN binding request on the selected
+// pair (or the best valid pair if selection hasn't happened yet) so that queued
+// DTLS-in-STUN flights and acks ride out immediately. This is what lets the
+// agent keep driving a SPED handshake after the pair is selected, when it would
+// otherwise stop sending STUN. Must run on the agent task loop goroutine.
+func (a *Agent) pingSelectedPairForPiggyback() {
+	pair := a.getSelectedPair()
+	if pair == nil {
+		pair = a.getBestValidCandidatePair()
+	}
+	if pair == nil {
+		return
+	}
+
+	a.getSelector().PingCandidate(pair.Local, pair.Remote)
 }
 
 func (a *Agent) closeMulticastConn() {

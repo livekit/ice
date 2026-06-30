@@ -496,7 +496,13 @@ func (s *controlledSelector) HandleBindingRequest(message *stun.Message, local, 
 	// on every inbound request creates a ping-pong busy loop: the remote side responds
 	// and sends its own request, which triggers another check here, repeating at 1/RTT.
 	// After connection, consent freshness is maintained by checkKeepalive() on a timer.
-	if pair.state != CandidatePairStateSucceeded || s.agent.getSelectedPair() == nil {
+	//
+	// Exception: while a DTLS-in-STUN (SPED) handshake is still in flight, keep
+	// responding with a triggered check so our queued DTLS flight/ack rides it.
+	// This is bounded — it stops as soon as piggybacking completes — so it does
+	// not reintroduce the post-connection busy loop.
+	if pair.state != CandidatePairStateSucceeded || s.agent.getSelectedPair() == nil ||
+		s.agent.piggybackActive() {
 		s.PingCandidate(local, remote)
 	}
 

@@ -93,11 +93,29 @@ func (a *Agent) Piggyback(packet []byte, end bool) bool {
 		a.piggyback.newFlight = end
 		crc := crc32.ChecksumIEEE(packet)
 		a.piggyback.packets = append(a.piggyback.packets, packetWithCrc{packet, crc})
+		// Wake the connectivity loop so this DTLS flight rides an immediate STUN
+		// instead of waiting for the next scheduled check or the DTLS
+		// retransmission timer. Without this the handshake becomes timer-paced
+		// once the candidate pair is selected (the agent otherwise stops sending
+		// STUN), which adds ~1 RTT per remaining flight on high-RTT links.
+		// requestConnectivityCheck() is a non-blocking channel send and does not
+		// take piggyback.mu, so it is safe to call while holding the lock.
+		a.requestConnectivityCheck()
 	} else {
 		a.piggyback.state = PiggybackingStatePending
 	}
 	// If we are connected we could send DTLS plain.
 	return true // a.connectionState == ConnectionStateConnected
+}
+
+// piggybackActive reports whether a DTLS-in-STUN (SPED) handshake is currently
+// in progress, i.e. the agent should keep emitting STUN to carry/ack flights
+// rather than going idle after the pair is selected.
+func (a *Agent) piggybackActive() bool {
+	a.piggyback.mu.Lock()
+	defer a.piggyback.mu.Unlock()
+
+	return a.piggyback.state != PiggybackingStateOff && a.piggyback.state != PiggybackingStateComplete
 }
 
 // GetPiggybackDataAndAcks returns a packet from the stored list in a round-robin fashion and a list of acks.
@@ -226,11 +244,19 @@ func (a *Agent) ReportDtlsPacket(packet []byte) {
 		return
 	}
 	crc := crc32.ChecksumIEEE(packet)
-	if !slices.Contains(a.piggyback.acks, crc) {
+	newAck := !slices.Contains(a.piggyback.acks, crc)
+	if newAck {
 		a.piggyback.acks = append(a.piggyback.acks, crc)
 		if len(a.piggyback.acks) > 4 {
 			a.piggyback.acks = a.piggyback.acks[1:]
 		}
 	}
 	a.piggyback.mu.Unlock()
+
+	// A freshly-received flight needs its ack carried back promptly; wake the
+	// connectivity loop so the ack rides an immediate STUN rather than waiting
+	// for the peer's retransmission.
+	if newAck {
+		a.requestConnectivityCheck()
+	}
 }
