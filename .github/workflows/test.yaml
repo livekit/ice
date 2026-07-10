@@ -16,18 +16,68 @@ on:
   push:
     branches:
       - main
+      - warp*
   pull_request:
 
 jobs:
+  # Inlined from pion/.goassets test.reusable.yml so a failed Codecov upload
+  # (this fork may have no CODECOV_TOKEN, and tokenless uploads are rejected)
+  # does not fail CI. Keeps the coverage upload but with fail_ci_if_error:
+  # false, so it resumes reporting automatically once a token is added.
   test:
-    uses: pion/.goassets/.github/workflows/test.reusable.yml@main
+    runs-on: ubuntu-24.04
+    name: Go ${{ matrix.go }}
+    permissions:
+      contents: read
     strategy:
       matrix:
         go: ["1.25", "1.24"] # auto-update/supported-go-version-list
       fail-fast: false
-    with:
-      go-version: ${{ matrix.go }}
-    secrets: inherit
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/go/bin
+            ~/.cache
+          key: ${{ runner.os }}-amd64-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-amd64-go-
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Setup go-acc
+        run: go install github.com/ory/go-acc@latest
+      - name: Run pre test hook
+        run: |
+          if [ -f .github/.ci.conf ]; then . .github/.ci.conf; fi
+          if [ -n "${PRE_TEST_HOOK}" ]; then ${PRE_TEST_HOOK}; fi
+      - name: Run test
+        run: |
+          if [ -f .github/.ci.conf ]; then . .github/.ci.conf; fi
+          set -euo pipefail
+          go-acc -o cover.out ./... -- -bench=. -v -race 2>&1 | tee /tmp/gotest.log
+      - name: Run post test hook
+        run: |
+          if [ -f .github/.ci.conf ]; then . .github/.ci.conf; fi
+          if [ -n "${POST_TEST_HOOK}" ]; then ${POST_TEST_HOOK}; fi
+      - name: Upload test log
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-log-${{ matrix.go }}
+          path: /tmp/gotest.log
+          if-no-files-found: error
+      - uses: codecov/codecov-action@v7
+        continue-on-error: true
+        with:
+          fail_ci_if_error: false
+          flags: go
+          name: codecov-umbrella
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   test-i386:
     uses: pion/.goassets/.github/workflows/test-i386.reusable.yml@main

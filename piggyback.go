@@ -54,7 +54,12 @@ func (p *piggybackingController) init() {
 func (p *piggybackingController) flushOnConnected() []packetWithCrc {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.state != PiggybackingStateOff {
+	// Flush leftover packets both when piggybacking was never supported
+	// (state Off) and when the SPED handshake was marked Complete while a
+	// local DTLS flight was still outstanding. Premature completion strands
+	// that flight (it is no longer piggybacked); sending it as plain DTLS on
+	// connect lets the peer's handshake finish instead of retransmit-storming.
+	if p.state != PiggybackingStateOff && p.state != PiggybackingStateComplete {
 		return nil
 	}
 	packets := p.packets
@@ -80,7 +85,12 @@ func (a *Agent) SetDtlsCallback(cb func(packet []byte, rAddr net.Addr)) {
 func (a *Agent) Piggyback(packet []byte, end bool) bool {
 	a.piggyback.mu.Lock()
 	defer a.piggyback.mu.Unlock()
-	if a.piggyback.state == PiggybackingStateOff {
+	// Treat Complete like Off: once the SPED handshake is done we no longer
+	// carry DTLS on STUN. Returning "not consumed" (false) when connected lets
+	// the DTLS layer send any late or retransmitted flight as plain DTLS via
+	// its own write path, instead of appending it to a queue that is never
+	// drained in the Complete state (which would silently swallow the packet).
+	if a.piggyback.state == PiggybackingStateOff || a.piggyback.state == PiggybackingStateComplete {
 		return a.connectionState != ConnectionStateConnected
 	}
 
@@ -161,6 +171,24 @@ func (a *Agent) ReportPiggybacking(packet []byte, acks []uint32, rAddr net.Addr)
 		a.log.Infof("Done with the SPED handshake", a.piggyback.state)
 		a.piggyback.acks = nil
 		a.piggyback.state = PiggybackingStateComplete
+		// A local DTLS flight may still be unacked at completion (the peer
+		// signaled done before it acked our last flight). Once Complete we no
+		// longer piggyback it, and flushOnConnected only fires on the ICE
+		// connect *transition* — which may already be past (Done and connected
+		// can race within the same tick on simultaneous join). If a pair is
+		// already selected, flush the stranded flight as plain DTLS now so the
+		// peer's handshake can finish; otherwise leave the packets for
+		// flushOnConnected to send when the connection is established.
+		if pair := a.getSelectedPair(); pair != nil && len(a.piggyback.packets) > 0 {
+			toFlush := a.piggyback.packets
+			a.piggyback.packets = []packetWithCrc{}
+			a.piggyback.mu.Unlock()
+			for _, p := range toFlush {
+				_, _ = pair.Write(p.data)
+			}
+
+			return
+		}
 		a.piggyback.mu.Unlock()
 
 		return
