@@ -16,6 +16,7 @@ on:
   push:
     branches:
       - main
+      - warp*
   schedule:
     - cron: "0 */8 * * *"
 
