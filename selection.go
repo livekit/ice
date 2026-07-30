@@ -98,6 +98,7 @@ func (s *controllingSelector) nominatePair(pair *CandidatePair) {
 		AttrControlling(s.agent.tieBreaker),
 		PriorityAttr(pair.Local.Priority()),
 	}
+	attributes = s.agent.appendPiggybackAttributes(attributes)
 	attributes = append(attributes,
 		stun.NewShortTermIntegrity(s.agent.remotePwd),
 		stun.Fingerprint)
@@ -113,6 +114,8 @@ func (s *controllingSelector) nominatePair(pair *CandidatePair) {
 }
 
 func (s *controllingSelector) HandleBindingRequest(message *stun.Message, local, remote Candidate) { //nolint:cyclop
+	s.agent.reportPiggybackingFromMessage(message, remote)
+
 	s.agent.sendBindingSuccess(message, local, remote)
 
 	pair := s.agent.findPair(local, remote)
@@ -184,6 +187,8 @@ func (s *controllingSelector) HandleSuccessResponse(
 		return
 	}
 
+	s.agent.reportPiggybackingFromMessage(m, remote)
+
 	s.log.Tracef("Inbound STUN (SuccessResponse) from %s to %s", remote, local)
 	pair := s.agent.findPair(local, remote)
 
@@ -223,6 +228,7 @@ func (s *controllingSelector) PingCandidate(local, remote Candidate) {
 		AttrControlling(s.agent.tieBreaker),
 		PriorityAttr(local.Priority()),
 	}
+	attributes = s.agent.appendPiggybackAttributes(attributes)
 	attributes = append(attributes,
 		stun.NewShortTermIntegrity(s.agent.remotePwd),
 		stun.Fingerprint)
@@ -375,6 +381,7 @@ func (s *controlledSelector) PingCandidate(local, remote Candidate) {
 		AttrControlled(s.agent.tieBreaker),
 		PriorityAttr(local.Priority()),
 	}
+	attributes = s.agent.appendPiggybackAttributes(attributes)
 	attributes = append(attributes,
 		stun.NewShortTermIntegrity(s.agent.remotePwd),
 		stun.Fingerprint)
@@ -442,9 +449,13 @@ func (s *controlledSelector) HandleSuccessResponse(
 	}
 
 	pair.UpdateRoundTripTime(rtt)
+
+	s.agent.reportPiggybackingFromMessage(m, remote)
 }
 
 func (s *controlledSelector) HandleBindingRequest(message *stun.Message, local, remote Candidate) { //nolint:cyclop
+	s.agent.reportPiggybackingFromMessage(message, remote)
+
 	pair := s.agent.findPair(local, remote)
 	if pair == nil {
 		pair = s.agent.addPair(local, remote)
