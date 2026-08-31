@@ -262,7 +262,7 @@ func newPingNoIOCand() *pingNoIOCand {
 func (d *pingNoIOCand) writeTo(b []byte, _ Candidate) (int, error) { return len(b), nil }
 
 func bareAgentForPing() *Agent {
-	return &Agent{
+	a := &Agent{
 		hostAcceptanceMinWait:  time.Hour,
 		srflxAcceptanceMinWait: time.Hour,
 		prflxAcceptanceMinWait: time.Hour,
@@ -288,6 +288,8 @@ func bareAgentForPing() *Agent {
 			candidatePairFunc: func(*CandidatePair) {},
 		}, //nolint formatting
 	}
+	a.piggyback.init()
+	return a
 }
 
 func bigStr() string { return strings.Repeat("x", 40000) }
