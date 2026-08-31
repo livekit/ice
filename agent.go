@@ -816,6 +816,18 @@ func (a *Agent) setSelectedPair(pair *CandidatePair) {
 
 	// Notify when the selected candidate pair changes
 	a.selectedCandidatePairNotifier.EnqueueSelectedCandidatePair(pair)
+
+	// If a SPED (DTLS-in-STUN) handshake is still in flight when the pair is
+	// nominated, drive a piggybacked ping on the freshly-selected pair *now*
+	// rather than waiting for the next scheduled connectivity check. A local
+	// DTLS flight (e.g. the DTLS-client Finished on the publisher / ice-lite
+	// answerer path) that became ready just before nomination would otherwise
+	// sit un-carried until the next check tick and miss the DTLS retransmit
+	// window (~1 RTT / ~100-140ms stall). Sending it on the nominated pair
+	// immediately gets it acked within ~1 RTT. Runs on the agent task loop.
+	if a.piggybackActive() {
+		a.pingSelectedPairForPiggyback()
+	}
 }
 
 func (a *Agent) pingAllCandidates() {
