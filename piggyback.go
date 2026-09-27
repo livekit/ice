@@ -93,10 +93,13 @@ func (a *Agent) Piggyback(packet []byte, end bool) bool {
 	// the DTLS layer send any late or retransmitted flight as plain DTLS via
 	// its own write path, instead of appending it to a queue that is never
 	// drained in the Complete state (which would silently swallow the packet).
-	if a.piggyback.state == PiggybackingStateOff || a.piggyback.state == PiggybackingStateComplete {
+	idle := a.piggyback.state == PiggybackingStateOff || a.piggyback.state == PiggybackingStateComplete
+	if idle && (a.piggyback.connected || packet == nil) {
 		return !a.piggyback.connected
 	}
 
+	// Idle but not connected yet: hold the flight for flushOnConnected rather
+	// than dropping it and waiting for a DTLS retransmission.
 	if packet != nil {
 		// If we receive a packet after the end of a flight we need
 		// to clear the outgoing list.
@@ -107,6 +110,9 @@ func (a *Agent) Piggyback(packet []byte, end bool) bool {
 		a.piggyback.newFlight = end
 		crc := crc32.ChecksumIEEE(packet)
 		a.piggyback.packets = append(a.piggyback.packets, packetWithCrc{packet, crc})
+		if idle {
+			return true
+		}
 		// Wake the connectivity loop so this DTLS flight rides an immediate STUN
 		// instead of waiting for the next scheduled check or the DTLS
 		// retransmission timer. Without this the handshake becomes timer-paced
