@@ -558,6 +558,17 @@ func (s *liteSelector) ContactCandidates() {
 	s.agent.setSelectedPair(pair)
 }
 
-func (s *liteSelector) PingCandidate(_, _ Candidate) {}
+func (s *liteSelector) PingCandidate(local, remote Candidate) {
+	// Lite agents normally generate no connectivity checks (RFC 8445 §7), so this
+	// is a no-op. The one exception is while a DTLS-in-STUN (SPED) handshake is in
+	// flight: the agent must emit a binding request to carry its queued DTLS
+	// flight/ack to the peer. Without it a server-role flight (e.g. the
+	// ServerHello) sits un-carried until the peer's DTLS retransmit (~1 RTT),
+	// losing the SPED speedup. Bounded to the handshake window, so it does not
+	// reintroduce general lite connectivity checks.
+	if s.agent.piggybackActive() {
+		s.pairCandidateSelector.PingCandidate(local, remote)
+	}
+}
 
 func (s *liteSelector) HandleSuccessResponse(*stun.Message, Candidate, Candidate, netip.AddrPort) {}

@@ -2122,6 +2122,15 @@ func (a *Agent) pingSelectedPairForPiggyback() {
 	if pair == nil {
 		pair = a.getBestValidCandidatePair()
 	}
+	// During a SPED handshake the pair may not be in the valid list yet: a lite
+	// controlled agent only validates a pair on nomination, so before that
+	// getBestValidCandidatePair returns nil and a server-role flight (e.g. the
+	// ServerHello) would otherwise sit un-carried until the peer's DTLS
+	// retransmit (~1 RTT). We already learned the remote from its piggybacked
+	// ClientHello, so fall back to the best available pair to carry the flight now.
+	if pair == nil && a.piggybackActive() {
+		pair = a.getBestAvailableCandidatePair()
+	}
 	if pair == nil {
 		return
 	}
