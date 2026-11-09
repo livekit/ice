@@ -1397,6 +1397,12 @@ func (a *Agent) setUniqueLiteCandidatePriority(cand Candidate) {
 	}
 
 	priority := cand.Priority()
+	// Reserve odd local preferences for IPv6 and even ones for IPv4. Otherwise,
+	// gathering the families in a different order on a migration target can
+	// lower its priority and let the client prune it in favor of the old path.
+	if cand.NetworkType().IsIPv4() {
+		priority -= 1 << 8
+	}
 	for {
 		if _, ok := used[priority]; !ok {
 			cand.setPriority(priority)
@@ -1404,7 +1410,7 @@ func (a *Agent) setUniqueLiteCandidatePriority(cand Candidate) {
 			return
 		}
 
-		priority -= 1 << 8
+		priority -= 2 << 8
 	}
 }
 
