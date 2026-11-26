@@ -11,8 +11,7 @@ import (
 )
 
 const (
-	receiveMTU             = 8192
-	defaultLocalPreference = 65535
+	receiveMTU = 8192
 
 	// ComponentRTP indicates that the candidate is used for RTP.
 	ComponentRTP uint16 = 1
@@ -100,6 +99,7 @@ type Candidate interface {
 	writeTo(raw []byte, dst Candidate) (int, error)
 	setPriority(uint32)
 	hasPriorityOverride() bool
+	lowerLocalPreference() bool
 	prflxPriority() uint32
 
 	replaceRemoteCandidateCacheValues(oldRemote, newRemote Candidate)

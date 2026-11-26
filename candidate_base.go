@@ -55,6 +55,7 @@ type candidateBase struct {
 	priorityOverride   uint32
 
 	relayLocalPreference uint16
+	localPreferenceStep  uint8
 
 	remoteCandidateCaches sync.Map // map[AddrPort]Candidate
 	isLocationTracked     bool
@@ -157,6 +158,12 @@ func (c *candidateBase) SetComponent(component uint16) {
 }
 
 // LocalPreference returns the local preference for this candidate.
+// In the local preference, the format is (step << 8) | address precedence:
+// the RFC 6724 precedence keeps address families apart, and
+// the step drops when two candidates would collide to separates
+// candidates of the same family.
+// Unlike libwebrtc, the high byte is a counter rather than a network adapter
+// preference, since Pion has no adapter types.
 func (c *candidateBase) LocalPreference() uint16 { //nolint:cyclop
 	if c.candidateType == CandidateTypeRelay {
 		return c.relayLocalPreference
@@ -198,7 +205,7 @@ func (c *candidateBase) LocalPreference() uint16 { //nolint:cyclop
 		// other-pref is the preference for the particular IP address from which
 		// the candidate was obtained.  When there is only a single IP address,
 		// this value SHOULD be set to the maximum allowed value (8191).
-		var otherPref uint16 = 8191
+		otherPref := (maxTCPLocalPreferenceStep-uint16(c.localPreferenceStep))<<8 | c.addressPrecedence()
 
 		directionPref := func() uint16 {
 			switch c.Type() {
@@ -234,7 +241,29 @@ func (c *candidateBase) LocalPreference() uint16 { //nolint:cyclop
 		return (1<<13)*directionPref + otherPref
 	}
 
-	return defaultLocalPreference
+	return (maxLocalPreferenceStep-uint16(c.localPreferenceStep))<<8 | c.addressPrecedence()
+}
+
+const (
+	maxLocalPreferenceStep    = 0xFF
+	maxTCPLocalPreferenceStep = 0x1F
+)
+
+func (c *candidateBase) addressPrecedence() uint16 {
+	return uint16(ipAddressPrecedence(c.addrPort().Addr(), c.NetworkType()))
+}
+
+func (c *candidateBase) lowerLocalPreference() bool {
+	maxStep := uint8(maxLocalPreferenceStep)
+	if c.NetworkType().IsTCP() {
+		maxStep = maxTCPLocalPreferenceStep
+	}
+	if c.candidateType == CandidateTypeRelay || c.localPreferenceStep >= maxStep {
+		return false
+	}
+	c.localPreferenceStep++
+
+	return true
 }
 
 // RelatedAddress returns *CandidateRelatedAddress.
