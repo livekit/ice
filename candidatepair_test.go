@@ -31,14 +31,14 @@ func TestCandidatePairPriority(t *testing.T) {
 		Pair         *CandidatePair
 		WantPriority uint64
 	}{
-		{Pair: newCandidatePair(hostCandidate(), hostCandidate(), false), WantPriority: 9151314440652587007},
-		{Pair: newCandidatePair(hostCandidate(), hostCandidate(), true), WantPriority: 9151314440652587007},
-		{Pair: newCandidatePair(hostCandidate(), prflxCandidate(), true), WantPriority: 7998392936314175488},
-		{Pair: newCandidatePair(hostCandidate(), prflxCandidate(), false), WantPriority: 7998392936314175487},
-		{Pair: newCandidatePair(hostCandidate(), srflxCandidate(), true), WantPriority: 7277816996102668288},
-		{Pair: newCandidatePair(hostCandidate(), srflxCandidate(), false), WantPriority: 7277816996102668287},
-		{Pair: newCandidatePair(hostCandidate(), relayCandidate(), true), WantPriority: 4398012955648},
-		{Pair: newCandidatePair(hostCandidate(), relayCandidate(), false), WantPriority: 4398012955647},
+		{Pair: newCandidatePair(hostCandidate(), hostCandidate(), false), WantPriority: 9151067050536279807},
+		{Pair: newCandidatePair(hostCandidate(), hostCandidate(), true), WantPriority: 9151067050536279807},
+		{Pair: newCandidatePair(hostCandidate(), prflxCandidate(), true), WantPriority: 7998145546197868288},
+		{Pair: newCandidatePair(hostCandidate(), prflxCandidate(), false), WantPriority: 7998145546197868287},
+		{Pair: newCandidatePair(hostCandidate(), srflxCandidate(), true), WantPriority: 7277569605986361088},
+		{Pair: newCandidatePair(hostCandidate(), srflxCandidate(), false), WantPriority: 7277569605986361087},
+		{Pair: newCandidatePair(hostCandidate(), relayCandidate(), true), WantPriority: 4398012840448},
+		{Pair: newCandidatePair(hostCandidate(), relayCandidate(), false), WantPriority: 4398012840447},
 	} {
 		require.Equal(t, test.Pair.priority(), test.WantPriority)
 	}

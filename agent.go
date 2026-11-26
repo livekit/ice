@@ -1175,7 +1175,7 @@ func (a *Agent) addRemotePassiveTCPCandidate(remoteCandidate Candidate) {
 		}
 
 		localCandidate.start(a, conn, a.startedCh)
-		a.setUniqueLiteCandidatePriority(localCandidate)
+		a.setUniqueCandidatePriority(localCandidate)
 		a.localCandidates[localCandidate.NetworkType()] = append(
 			a.localCandidates[localCandidate.NetworkType()],
 			localCandidate,
@@ -1381,16 +1381,13 @@ func (a *Agent) addRemoteCandidate(cand Candidate) bool { //nolint:cyclop
 	return true
 }
 
-// setUniqueLiteCandidatePriority gives each local ICE-lite candidate a unique
+// setUniqueCandidatePriority gives each local candidate a unique
 // priority that doesn't depend on gather order, so it stays stable across ICE
-// restarts. Like libwebrtc, the local preference is
-// (counter << 8) | address precedence: the precedence keeps address families
-// apart, and the counter only drops to separate candidates of the same family.
-// Unlike libwebrtc, the high byte is a counter rather than a network adapter
-// preference, since Pion has no adapter types.
+// restarts.
+
 // https://datatracker.ietf.org/doc/html/rfc8445#section-5.1.2
-func (a *Agent) setUniqueLiteCandidatePriority(cand Candidate) {
-	if !a.lite || cand.hasPriorityOverride() {
+func (a *Agent) setUniqueCandidatePriority(cand Candidate) {
+	if cand.hasPriorityOverride() {
 		return
 	}
 
@@ -1401,33 +1398,16 @@ func (a *Agent) setUniqueLiteCandidatePriority(cand Candidate) {
 		}
 	}
 
-	const (
-		precedenceMask = 0xFF << 8  // low byte of the local preference.
-		counterMask    = 0xFF << 16 // high byte of the local preference.
-		counterStep    = 1 << 16
-	)
-
-	priority := cand.Priority()
-	if cand.Type() != CandidateTypeRelay {
-		precedence := ipAddressPrecedence(cand.addrPort().Addr(), cand.NetworkType())
-		priority = (priority &^ precedenceMask) | uint32(precedence)<<8
-	}
-
 	for {
-		if _, ok := used[priority]; !ok {
-			break
+		if _, ok := used[cand.Priority()]; !ok {
+			return
 		}
+		if !cand.lowerLocalPreference() {
+			a.log.Warnf("No unique priority left for candidate %s, using %d", cand, cand.Priority())
 
-		if priority&counterMask == 0 {
-			a.log.Warnf("No unique priority left for ICE-lite candidate %s, using %d", cand, priority)
-
-			break
+			return
 		}
-
-		priority -= counterStep
 	}
-
-	cand.setPriority(priority)
 }
 
 func (a *Agent) shouldAcceptRemoteCandidate(cand Candidate) bool {
@@ -1506,7 +1486,7 @@ func (a *Agent) addCandidate(
 
 		a.setCandidateExtensions(cand, candidateGeneration)
 		cand.start(a, candidateConn, a.startedCh)
-		a.setUniqueLiteCandidatePriority(cand)
+		a.setUniqueCandidatePriority(cand)
 
 		set = append(set, cand)
 		a.localCandidates[cand.NetworkType()] = set

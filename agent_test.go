@@ -2165,7 +2165,7 @@ func TestLiteLocalCandidatePrioritiesAreUnique(t *testing.T) {
 		candidate, err := NewCandidateHost(&CandidateHostConfig{Network: "udp", Address: "192.0.2." + strconv.Itoa(i+1), Port: 10000 + i, Component: ComponentRTP})
 		require.NoError(t, err)
 
-		agent.setUniqueLiteCandidatePriority(candidate)
+		agent.setUniqueCandidatePriority(candidate)
 		agent.localCandidates[candidate.NetworkType()] = append(agent.localCandidates[candidate.NetworkType()], candidate)
 
 		if i == 0 {
@@ -2176,6 +2176,31 @@ func TestLiteLocalCandidatePrioritiesAreUnique(t *testing.T) {
 
 		require.Equal(t, previousPriority-(1<<16), candidate.Priority())
 		previousPriority = candidate.Priority()
+	}
+}
+
+func TestTCPLocalCandidatePrioritiesKeepDirectionPref(t *testing.T) {
+	agent := &Agent{localCandidates: make(map[NetworkType][]Candidate), log: logging.NewDefaultLoggerFactory().NewLogger("ice")}
+
+	priorities := make(map[uint32]struct{})
+	for i := range maxTCPLocalPreferenceStep + 2 {
+		candidate, err := NewCandidateHost(&CandidateHostConfig{
+			Network:   tcp,
+			Address:   "192.0.2." + strconv.Itoa(i+1),
+			Port:      10000,
+			Component: ComponentRTP,
+			TCPType:   TCPTypePassive,
+		})
+		require.NoError(t, err)
+
+		agent.setUniqueCandidatePriority(candidate)
+		agent.localCandidates[candidate.NetworkType()] = append(agent.localCandidates[candidate.NetworkType()], candidate)
+
+		require.Equal(t, uint16(4), candidate.LocalPreference()>>13, "direction pref of candidate %d", i)
+		if i <= maxTCPLocalPreferenceStep {
+			require.NotContains(t, priorities, candidate.Priority())
+			priorities[candidate.Priority()] = struct{}{}
+		}
 	}
 }
 
@@ -2208,7 +2233,7 @@ func TestLiteLocalCandidatePrioritiesDoNotDependOnGatherOrder(t *testing.T) {
 				priorities := make(map[string]uint32)
 				for _, address := range addresses {
 					candidate := newCandidate(address)
-					agent.setUniqueLiteCandidatePriority(candidate)
+					agent.setUniqueCandidatePriority(candidate)
 					agent.localCandidates[candidate.NetworkType()] = append(
 						agent.localCandidates[candidate.NetworkType()], candidate,
 					)
@@ -2251,7 +2276,7 @@ func TestLiteLocalCandidatePriorityKeepsOverride(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		agent.setUniqueLiteCandidatePriority(candidate)
+		agent.setUniqueCandidatePriority(candidate)
 		agent.localCandidates[candidate.NetworkType()] = append(agent.localCandidates[candidate.NetworkType()], candidate)
 		require.Equal(t, uint32(200), candidate.Priority())
 	}
@@ -2646,6 +2671,7 @@ func TestAcceptAggressiveNomination(t *testing.T) { //nolint:cyclop
 			var bcandidates []Candidate
 			bcandidates, err = bAgent.GetLocalCandidates()
 			require.NoError(t, err)
+			selectedPriority := aAgent.getSelectedPair().Remote.Priority()
 
 			for _, cand := range bcandidates {
 				if cand != bAgent.getSelectedPair().Local { //nolint:nestif
@@ -2655,9 +2681,9 @@ func TestAcceptAggressiveNomination(t *testing.T) { //nolint:cyclop
 							for _, candidate := range candidates {
 								if candidate.Equal(cand) {
 									if tc.useHigherPriority {
-										candidate.(*CandidateHost).priorityOverride += 1000 //nolint:forcetypeassert
+										candidate.(*CandidateHost).priorityOverride = selectedPriority + 1000 //nolint:forcetypeassert
 									} else {
-										candidate.(*CandidateHost).priorityOverride -= 1000 //nolint:forcetypeassert
+										candidate.(*CandidateHost).priorityOverride = selectedPriority - 1000 //nolint:forcetypeassert
 									}
 
 									break expected_change_priority
@@ -2676,9 +2702,9 @@ func TestAcceptAggressiveNomination(t *testing.T) { //nolint:cyclop
 							for _, candidate := range candidates {
 								if candidate.Equal(cand) {
 									if tc.useHigherPriority {
-										candidate.(*CandidateHost).priorityOverride += 500 //nolint:forcetypeassert
+										candidate.(*CandidateHost).priorityOverride = selectedPriority + 500 //nolint:forcetypeassert
 									} else {
-										candidate.(*CandidateHost).priorityOverride -= 500 //nolint:forcetypeassert
+										candidate.(*CandidateHost).priorityOverride = selectedPriority - 500 //nolint:forcetypeassert
 									}
 
 									break change_priority

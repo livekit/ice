@@ -55,15 +55,15 @@ func TestCandidatePriority(t *testing.T) {
 		Candidate    Candidate
 		WantPriority uint32
 	}{
-		{Candidate: &CandidateHost{candidateBase: candidateBase{candidateType: CandidateTypeHost, component: ComponentRTP}}, WantPriority: 2130706431},
-		{Candidate: &CandidateHost{candidateBase: candidateBase{candidateType: CandidateTypeHost, component: ComponentRTP, networkType: NetworkTypeTCP4, tcpType: TCPTypeActive}}, WantPriority: 1675624447},
-		{Candidate: &CandidateHost{candidateBase: candidateBase{candidateType: CandidateTypeHost, component: ComponentRTP, networkType: NetworkTypeTCP4, tcpType: TCPTypePassive}}, WantPriority: 1671430143},
-		{Candidate: &CandidateHost{candidateBase: candidateBase{candidateType: CandidateTypeHost, component: ComponentRTP, networkType: NetworkTypeTCP4, tcpType: TCPTypeSimultaneousOpen}}, WantPriority: 1667235839},
-		{Candidate: &CandidatePeerReflexive{candidateBase: candidateBase{candidateType: CandidateTypePeerReflexive, component: ComponentRTP}}, WantPriority: 1862270975},
-		{Candidate: &CandidatePeerReflexive{candidateBase: candidateBase{candidateType: CandidateTypePeerReflexive, component: ComponentRTP, networkType: NetworkTypeTCP6, tcpType: TCPTypeSimultaneousOpen}}, WantPriority: 1407188991},
-		{Candidate: &CandidatePeerReflexive{candidateBase: candidateBase{candidateType: CandidateTypePeerReflexive, component: ComponentRTP, networkType: NetworkTypeTCP6, tcpType: TCPTypeActive}}, WantPriority: 1402994687},
-		{Candidate: &CandidatePeerReflexive{candidateBase: candidateBase{candidateType: CandidateTypePeerReflexive, component: ComponentRTP, networkType: NetworkTypeTCP6, tcpType: TCPTypePassive}}, WantPriority: 1398800383},
-		{Candidate: &CandidateServerReflexive{candidateBase: candidateBase{candidateType: CandidateTypeServerReflexive, component: ComponentRTP}}, WantPriority: 1694498815},
+		{Candidate: &CandidateHost{candidateBase: candidateBase{candidateType: CandidateTypeHost, component: ComponentRTP}}, WantPriority: 2130648831},
+		{Candidate: &CandidateHost{candidateBase: candidateBase{candidateType: CandidateTypeHost, component: ComponentRTP, networkType: NetworkTypeTCP4, tcpType: TCPTypeActive}}, WantPriority: 1675566847},
+		{Candidate: &CandidateHost{candidateBase: candidateBase{candidateType: CandidateTypeHost, component: ComponentRTP, networkType: NetworkTypeTCP4, tcpType: TCPTypePassive}}, WantPriority: 1671372543},
+		{Candidate: &CandidateHost{candidateBase: candidateBase{candidateType: CandidateTypeHost, component: ComponentRTP, networkType: NetworkTypeTCP4, tcpType: TCPTypeSimultaneousOpen}}, WantPriority: 1667178239},
+		{Candidate: &CandidatePeerReflexive{candidateBase: candidateBase{candidateType: CandidateTypePeerReflexive, component: ComponentRTP}}, WantPriority: 1862213375},
+		{Candidate: &CandidatePeerReflexive{candidateBase: candidateBase{candidateType: CandidateTypePeerReflexive, component: ComponentRTP, networkType: NetworkTypeTCP6, tcpType: TCPTypeSimultaneousOpen}}, WantPriority: 1407133951},
+		{Candidate: &CandidatePeerReflexive{candidateBase: candidateBase{candidateType: CandidateTypePeerReflexive, component: ComponentRTP, networkType: NetworkTypeTCP6, tcpType: TCPTypeActive}}, WantPriority: 1402939647},
+		{Candidate: &CandidatePeerReflexive{candidateBase: candidateBase{candidateType: CandidateTypePeerReflexive, component: ComponentRTP, networkType: NetworkTypeTCP6, tcpType: TCPTypePassive}}, WantPriority: 1398745343},
+		{Candidate: &CandidateServerReflexive{candidateBase: candidateBase{candidateType: CandidateTypeServerReflexive, component: ComponentRTP}}, WantPriority: 1694441215},
 		{Candidate: &CandidateRelay{candidateBase: candidateBase{candidateType: CandidateTypeRelay, component: ComponentRTP, relayLocalPreference: relayProtocolPreference(udp)}}, WantPriority: 1023},
 		{Candidate: &CandidateRelay{candidateBase: candidateBase{candidateType: CandidateTypeRelay, component: ComponentRTP, relayLocalPreference: relayProtocolPreference(tcp)}}, WantPriority: 511},
 	} {
